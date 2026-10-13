@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f6f5f1" />
+    <meta name="description" content="把长文案，变成值得展示的 AI 演示文稿。" />
+    <title>页间之间 — AI 网页 PPT 生成器</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="页间之间首页">
+          <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+          <span class="brand-name">页间之间</span>
+          <span class="brand-divider"></span>
+          <span class="brand-caption">AI PRESENTATION STUDIO</span>
+        </a>
+        <div class="topbar-right">
+          <span class="engine-status"><span class="status-dot"></span><span id="engineLabel">演示引擎就绪</span></span>
+          <a class="github-link" href="#how-it-works">了解更多 <span aria-hidden="true">↗</span></a>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="editor-panel" aria-labelledby="editor-title">
+          <div class="section-kicker"><span class="kicker-line"></span> YOUR NEXT BIG IDEA</div>
+          <h1 id="editor-title">让好内容<br />自然成为<span>好演示。</span></h1>
+          <p class="editor-intro">粘贴你的想法，AI 会把它整理成一场有重点、有节奏的演示。</p>
+
+          <label class="field-label" for="sourceText">原始文案 <span class="label-hint">支持粘贴长文本</span></label>
+          <div class="textarea-wrap">
+            <textarea id="sourceText" maxlength="20000" spellcheck="false" placeholder="粘贴文章、提案、研究笔记……"></textarea>
+            <div class="textarea-footer">
+              <button id="sampleButton" class="text-button" type="button"><span aria-hidden="true">✳</span> 使用示例文案</button>
+              <span id="charCount">0 / 20,000</span>
+            </div>
+          </div>
+
+          <div class="generation-row">
+            <button id="generateButton" class="generate-button" type="button">
+              <span class="button-sparkle" aria-hidden="true">✳</span>
+              <span id="generateLabel">生成我的 PPT</span>
+              <span class="button-arrow" aria-hidden="true">↗</span>
+            </button>
+            <span class="generate-note"><span aria-hidden="true">◷</span> 大约需要 20 秒</span>
+          </div>
+
+          <section class="generation-status" id="generationStatus" aria-live="polite" hidden>
+            <div class="status-copy"><span id="progressMessage">正在准备</span><span id="progressValue">0%</span></div>
+            <div class="progress-track"><span id="progressFill"></span></div>
+          </section>
+
+          <div class="editor-bottom">
+            <div class="privacy-note"><span aria-hidden="true">◈</span> 你的内容仅用于本次生成</div>
+            <div class="keyboard-hint"><kbd>⌘</kbd> <kbd>↵</kbd> 快速生成</div>
+          </div>
+        </section>
+
+        <section class="presentation-panel" aria-label="演示文稿预览">
+          <div class="preview-topline">
+            <div class="preview-document">
+              <span class="document-icon" aria-hidden="true">▤</span>
+              <div><div class="document-title" id="deckName">你的下一场演示</div><div class="document-subtitle" id="deckMeta">还没开始 · 预计 6 页</div></div>
+            </div>
+            <div class="preview-actions">
+              <button id="exportButton" class="icon-button export-button" type="button" aria-label="导出为 HTML" title="导出独立 HTML" disabled><span aria-hidden="true">⇩</span></button>
+              <button id="fullscreenButton" class="icon-button" type="button" aria-label="全屏演示" title="全屏演示" disabled><span aria-hidden="true">⛶</span></button>
+            </div>
+          </div>
+
+          <div class="presentation-stage" id="presentationStage" data-theme="paper">
+            <div class="stage-grain"></div>
+            <div class="empty-state" id="emptyState">
+              <div class="empty-illustration" aria-hidden="true"><div class="empty-card card-back"></div><div class="empty-card card-middle"></div><div class="empty-card card-front"><span class="mini-star">✳</span><span class="mini-lines"></span></div></div>
+              <span class="empty-overline">YOUR CANVAS IS READY</span>
+              <p>故事，从这里开始。</p>
+              <span class="empty-caption">生成后，你的演示会出现在这里</span>
+            </div>
+            <article class="slide-canvas" id="slideCanvas" aria-live="polite" hidden></article>
+            <div class="stage-footer">
+              <div class="slide-counter"><span id="currentPage">01</span><span class="counter-divider">/</span><span id="totalPages">06</span></div>
+              <div class="theme-picker" role="group" aria-label="演示配色主题">
+                <button class="theme-button active" data-theme-choice="paper" type="button" aria-label="奶油纸张主题" aria-pressed="true"><span class="theme-swatch swatch-paper"></span></button>
+                <button class="theme-button" data-theme-choice="midnight" type="button" aria-label="午夜蓝主题" aria-pressed="false"><span class="theme-swatch swatch-midnight"></span></button>
+                <button class="theme-button" data-theme-choice="botanical" type="button" aria-label="植物绿主题" aria-pressed="false"><span class="theme-swatch swatch-botanical"></span></button>
+                <span class="theme-caption">COLOR STORY</span>
+              </div>
+              <div class="slide-navigation"><button id="previousButton" type="button" aria-label="上一页" disabled>←</button><button id="nextButton" type="button" aria-label="下一页" disabled>→</button></div>
+            </div>
+          </div>
+          <div class="preview-caption"><span id="slideHint">提交一段文案，开启新的故事</span><span class="preview-key-hint"><kbd>←</kbd><kbd>→</kbd> 翻页</span></div>
+        </section>
+      </main>
+
+      <footer class="page-footer" id="how-it-works">
+        <span>一段文字，重新讲述。<span class="footer-flower">✳</span></span>
+        <span>BUILT FOR IDEAS THAT MATTER</span>
+      </footer>
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>
