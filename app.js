@@ -8,6 +8,12 @@ const sampleText = `很多团队已经开始使用人工智能，但真正的挑
 
 AI 转型不是一场短暂的技术项目，而是不断学习、持续改善的过程。成功的团队会从业务目标出发，先解决一个真实问题，再把有效的方法推广到更多场景。`;
 
+const chatSamples = [
+  '帮我做一份 6 页的新产品发布会演示',
+  '把「AI 客服到底值不值得投入」讲给管理层听',
+  '用 5 页讲清楚我们为什么需要数据治理'
+];
+
 const sourceText = document.querySelector('#sourceText');
 const charCount = document.querySelector('#charCount');
 const generateButton = document.querySelector('#generateButton');
@@ -25,12 +31,35 @@ const previousButton = document.querySelector('#previousButton');
 const nextButton = document.querySelector('#nextButton');
 const exportButton = document.querySelector('#exportButton');
 const fullscreenButton = document.querySelector('#fullscreenButton');
+const engineLabel = document.querySelector('#engineLabel');
+const quickHint = document.querySelector('#quickHint');
 const toast = document.querySelector('#toast');
+
+const textModePanel = document.querySelector('#textModePanel');
+const chatModePanel = document.querySelector('#chatModePanel');
+const chatLog = document.querySelector('#chatLog');
+const chatInput = document.querySelector('#chatInput');
+const chatSendButton = document.querySelector('#chatSendButton');
+const chatTurnCount = document.querySelector('#chatTurnCount');
+
+const settingsModal = document.querySelector('#settingsModal');
+const settingsKeyInput = document.querySelector('#settingsKeyInput');
+const settingsUrlInput = document.querySelector('#settingsUrlInput');
+const settingsModelInput = document.querySelector('#settingsModelInput');
+const settingsKeyState = document.querySelector('#settingsKeyState');
+const settingsStatus = document.querySelector('#settingsStatus');
+const settingsSaveButton = document.querySelector('#settingsSaveButton');
+const settingsTestButton = document.querySelector('#settingsTestButton');
 
 let slides = [];
 let slideIndex = 0;
 let toastTimer;
 let controller;
+let chatController;
+let chatMessages = [];
+let chatBusy = false;
+let currentMode = 'text';
+let settingsBusy = false;
 
 function showToast(message, error = false) {
   toast.textContent = message;
@@ -70,11 +99,48 @@ function renderSlide() {
   document.querySelector('#slideHint').textContent = `${slide.eyebrow || '正在演示'} · ${slide.title}`;
 }
 
+function applyDeck(nextSlides, meta) {
+  slides = nextSlides;
+  slideIndex = 0;
+  renderSlide();
+  document.querySelector('#deckName').textContent = slides[0].title;
+  document.querySelector('#deckMeta').textContent = meta;
+  exportButton.disabled = false;
+  fullscreenButton.disabled = false;
+}
+
 function updateProgress(progress, message) {
   const value = Math.max(0, Math.min(100, progress));
   progressFill.style.width = `${value}%`;
   progressValue.textContent = `${value}%`;
   progressMessage.textContent = message;
+}
+
+function changeSlide(direction) {
+  if (!slides.length) return;
+  slideIndex = Math.max(0, Math.min(slides.length - 1, slideIndex + direction));
+  renderSlide();
+}
+
+// 逐个解析服务端发送的 SSE 事件。
+async function readEventStream(response, onEvent) {
+  if (!response.body) throw new Error('浏览器无法读取流式响应，请更新浏览器后重试。');
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  while (true) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value, { stream: !done });
+    const events = buffer.split('\n\n');
+    buffer = events.pop() || '';
+    for (const eventText of events) {
+      const eventName = eventText.match(/^event:\s*(.+)$/m)?.[1]?.trim();
+      const dataText = eventText.match(/^data:\s*(.+)$/m)?.[1];
+      if (!eventName || !dataText) continue;
+      onEvent(eventName, JSON.parse(dataText));
+    }
+    if (done) break;
+  }
 }
 
 async function generateDeck() {
@@ -90,6 +156,7 @@ async function generateDeck() {
   generateLabel.textContent = '正在生成…';
   generationStatus.hidden = false;
   updateProgress(5, '正在连接 AI 生成引擎');
+  let received = false;
   try {
     const response = await fetch('/api/generate', {
       method: 'POST',
@@ -101,40 +168,17 @@ async function generateDeck() {
       const body = await response.json().catch(() => ({}));
       throw new Error(body.error || `生成请求失败（${response.status}）`);
     }
-    if (!response.body) throw new Error('浏览器无法读取流式响应，请更新浏览器后重试。');
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let finished = false;
-    while (!finished) {
-      const { value, done } = await reader.read();
-      buffer += decoder.decode(value, { stream: !done });
-      const events = buffer.split('\n\n');
-      buffer = events.pop() || '';
-      for (const eventText of events) {
-        const eventName = eventText.match(/^event:\s*(.+)$/m)?.[1]?.trim();
-        const dataText = eventText.match(/^data:\s*(.+)$/m)?.[1];
-        if (!eventName || !dataText) continue;
-        const data = JSON.parse(dataText);
-        if (eventName === 'progress') updateProgress(data.progress, data.message);
-        if (eventName === 'error') throw new Error(data.message || '生成失败，请重试。');
-        if (eventName === 'complete') {
-          slides = data.slides;
-          slideIndex = 0;
-          renderSlide();
-          document.querySelector('#deckName').textContent = slides[0].title;
-          document.querySelector('#deckMeta').textContent = `AI 为你整理 · 共 ${slides.length} 页`;
-          updateProgress(100, '演示文稿已准备就绪');
-          exportButton.disabled = false;
-          fullscreenButton.disabled = false;
-          document.querySelector('#engineLabel').textContent = '演示引擎就绪';
-          showToast('演示文稿生成完成，故事准备好开始了。');
-          finished = true;
-        }
+    await readEventStream(response, (eventName, data) => {
+      if (eventName === 'progress') updateProgress(data.progress, data.message);
+      if (eventName === 'error') throw new Error(data.message || '生成失败，请重试。');
+      if (eventName === 'complete') {
+        received = true;
+        applyDeck(data.slides, `AI 为你整理 · 共 ${data.slides.length} 页`);
+        updateProgress(100, '演示文稿已准备就绪');
+        showToast('演示文稿生成完成，故事准备好开始了。');
       }
-      if (done) break;
-    }
-    if (!slides.length) throw new Error('连接已结束，但没有收到演示内容，请再试一次。');
+    });
+    if (!received) throw new Error('连接已结束，但没有收到演示内容，请再试一次。');
   } catch (error) {
     if (error.name !== 'AbortError') {
       showToast(error.message || '生成失败，请检查网络后重试。', true);
@@ -142,15 +186,274 @@ async function generateDeck() {
     }
   } finally {
     generateButton.disabled = false;
-    generateLabel.textContent = '重新生成 PPT';
+    generateLabel.textContent = slides.length ? '重新生成 PPT' : '生成我的 PPT';
     controller = null;
   }
 }
 
-function changeSlide(direction) {
-  if (!slides.length) return;
-  slideIndex = Math.max(0, Math.min(slides.length - 1, slideIndex + direction));
-  renderSlide();
+function chatHistory() {
+  return chatMessages
+    .filter((message) => !message.pending)
+    .map((message) => ({
+      role: message.role,
+      content: message.role === 'assistant'
+        ? JSON.stringify({ reply: message.text, slides: message.slides || null })
+        : message.text
+    }));
+}
+
+function renderChat() {
+  if (!chatMessages.length) {
+    chatLog.innerHTML = `<div class="chat-empty">
+      <p class="chat-empty-title">先说说你想要什么演示</p>
+      <div class="chat-samples">${chatSamples.map((sample) => `<button class="chat-sample" type="button" data-sample="${escapeHtml(sample)}">${escapeHtml(sample)}</button>`).join('')}</div>
+    </div>`;
+    chatTurnCount.textContent = '0';
+    return;
+  }
+  chatLog.innerHTML = chatMessages.map((message) => {
+    const classes = ['chat-row', message.role === 'user' ? 'from-user' : 'from-ai'];
+    if (message.pending) classes.push('is-pending');
+    if (message.error) classes.push('is-error');
+    const text = message.text || (message.pending ? message.stage || '正在思考' : '');
+    const deckNote = message.slides?.length ? `<span class="chat-deck">已更新演示 · ${message.slides.length} 页</span>` : '';
+    return `<div class="${classes.join(' ')}">
+      <div class="chat-bubble">${escapeHtml(text)}${message.pending ? '<span class="chat-caret"></span>' : ''}</div>
+      ${deckNote}
+    </div>`;
+  }).join('');
+  chatLog.scrollTop = chatLog.scrollHeight;
+  chatTurnCount.textContent = String(chatMessages.filter((message) => !message.pending).length);
+}
+
+function updateChatControls() {
+  chatSendButton.disabled = chatBusy;
+  chatInput.disabled = chatBusy;
+  chatSendButton.classList.toggle('is-busy', chatBusy);
+}
+
+async function sendChat() {
+  const text = chatInput.value.trim();
+  if (!text) {
+    showToast('先写下你的想法。', true);
+    chatInput.focus();
+    return;
+  }
+  if (chatBusy) return;
+
+  chatMessages.push({ role: 'user', text });
+  const payload = chatHistory();
+  const assistantMessage = { role: 'assistant', text: '', stage: '', pending: true, slides: null };
+  chatMessages.push(assistantMessage);
+  chatInput.value = '';
+  autoGrowChatInput();
+  chatBusy = true;
+  renderChat();
+  updateChatControls();
+
+  chatController?.abort();
+  chatController = new AbortController();
+  try {
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+      body: JSON.stringify({ messages: payload }),
+      signal: chatController.signal
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.error || `对话请求失败（${response.status}）`);
+    }
+    let answered = false;
+    await readEventStream(response, (eventName, data) => {
+      if (eventName === 'progress') {
+        assistantMessage.stage = data.message || '';
+        renderChat();
+      }
+      if (eventName === 'reply') {
+        assistantMessage.text = data.text || '';
+        renderChat();
+      }
+      if (eventName === 'error') throw new Error(data.message || '对话失败，请重试。');
+      if (eventName === 'complete') {
+        answered = true;
+        assistantMessage.pending = false;
+        assistantMessage.text = data.reply || assistantMessage.text || '我没有收到有效回复。';
+        if (Array.isArray(data.slides) && data.slides.length) {
+          assistantMessage.slides = data.slides;
+          applyDeck(data.slides, `对话生成 · 共 ${data.slides.length} 页`);
+          showToast('演示已根据对话更新。');
+        }
+      }
+    });
+    if (!answered) {
+      assistantMessage.pending = false;
+      assistantMessage.text = assistantMessage.text || '连接中断了，请再试一次。';
+      assistantMessage.error = true;
+    }
+    renderChat();
+  } catch (error) {
+    if (error.name !== 'AbortError') {
+      assistantMessage.pending = false;
+      assistantMessage.text = error.message || '对话失败，请检查模型设置后重试。';
+      assistantMessage.error = true;
+      renderChat();
+      showToast(error.message || '对话失败，请重试。', true);
+    } else {
+      chatMessages = chatMessages.filter((message) => message !== assistantMessage);
+      renderChat();
+    }
+  } finally {
+    chatBusy = false;
+    updateChatControls();
+    chatController = null;
+    chatInput.focus();
+  }
+}
+
+function autoGrowChatInput() {
+  chatInput.style.height = 'auto';
+  chatInput.style.height = `${Math.min(chatInput.scrollHeight, 112)}px`;
+}
+
+function resetChat() {
+  chatController?.abort();
+  chatMessages = [];
+  chatBusy = false;
+  updateChatControls();
+  renderChat();
+  chatInput.focus();
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('[data-mode]').forEach((button) => {
+    const selected = button.dataset.mode === mode;
+    button.classList.toggle('active', selected);
+    button.setAttribute('aria-selected', String(selected));
+  });
+  textModePanel.hidden = mode !== 'text';
+  chatModePanel.hidden = mode !== 'chat';
+  quickHint.innerHTML = mode === 'chat' ? '<kbd>Enter</kbd> 发送' : '<kbd>⌘</kbd> <kbd>↵</kbd> 快速生成';
+  (mode === 'chat' ? chatInput : sourceText).focus();
+}
+
+function openSettings() {
+  settingsModal.hidden = false;
+  settingsModal.classList.add('visible');
+  loadSettings();
+  settingsKeyInput.focus();
+}
+
+function closeSettings() {
+  settingsModal.classList.remove('visible');
+  settingsModal.hidden = true;
+}
+
+function describeSettings(data) {
+  const source = {
+    env: '密钥来自环境变量 OPENAI_API_KEY',
+    config: '设置已保存在本机',
+    legacy: '密钥来自项目里的 api.txt',
+    demo: '还没配置密钥，当前使用内置演示生成器'
+  }[data.source] || '';
+  return `${source} · 配置文件 ${data.configPath}`;
+}
+
+async function loadSettings() {
+  try {
+    const response = await fetch('/api/settings');
+    const data = await response.json();
+    settingsUrlInput.value = data.baseUrl || '';
+    settingsModelInput.value = data.model || '';
+    settingsKeyInput.value = '';
+    settingsKeyInput.placeholder = data.hasApiKey ? '已保存，留空表示不修改' : 'sk-…';
+    settingsKeyState.textContent = data.hasApiKey ? '已配置' : '未配置';
+    settingsStatus.textContent = describeSettings(data);
+  } catch {
+    settingsStatus.textContent = '读取设置失败，请确认本地服务正在运行。';
+  }
+}
+
+async function saveSettings() {
+  if (settingsBusy) return;
+  const payload = {
+    baseUrl: settingsUrlInput.value.trim(),
+    model: settingsModelInput.value.trim()
+  };
+  if (settingsKeyInput.value.trim()) payload.apiKey = settingsKeyInput.value.trim();
+  settingsBusy = true;
+  settingsSaveButton.disabled = true;
+  try {
+    const response = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || '保存失败，请检查填写内容。');
+    settingsUrlInput.value = data.baseUrl || '';
+    settingsModelInput.value = data.model || '';
+    settingsKeyInput.value = '';
+    settingsKeyInput.placeholder = data.hasApiKey ? '已保存，留空表示不修改' : 'sk-…';
+    settingsKeyState.textContent = data.hasApiKey ? '已配置' : '未配置';
+    settingsStatus.textContent = describeSettings(data);
+    await refreshHealth();
+    showToast('模型设置已保存。');
+    closeSettings();
+  } catch (error) {
+    showToast(error.message || '保存失败。', true);
+    settingsStatus.textContent = error.message || '保存失败。';
+  } finally {
+    settingsBusy = false;
+    settingsSaveButton.disabled = false;
+  }
+}
+
+async function testSettings() {
+  if (settingsBusy) return;
+  settingsBusy = true;
+  settingsTestButton.disabled = true;
+  settingsTestButton.textContent = '正在测试…';
+  try {
+    const response = await fetch('/api/settings/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        apiKey: settingsKeyInput.value.trim(),
+        baseUrl: settingsUrlInput.value.trim(),
+        model: settingsModelInput.value.trim()
+      })
+    });
+    const data = await response.json();
+    if (data.ok) {
+      settingsStatus.textContent = data.message || '连接成功。';
+      showToast(data.message || '连接成功。');
+    } else {
+      settingsStatus.textContent = data.error || '连接失败。';
+      showToast(data.error || '连接失败。', true);
+    }
+  } catch (error) {
+    settingsStatus.textContent = error.message || '连接失败。';
+    showToast(error.message || '连接失败。', true);
+  } finally {
+    settingsBusy = false;
+    settingsTestButton.disabled = false;
+    settingsTestButton.textContent = '测试连接';
+  }
+}
+
+async function refreshHealth() {
+  try {
+    const health = await (await fetch('/api/health')).json();
+    if (health.mode === 'model') {
+      engineLabel.textContent = `${health.model} · ${health.source === 'env' ? '环境变量' : '已连接'}`;
+    } else {
+      engineLabel.textContent = '演示模式 · 无需 API Key';
+    }
+  } catch {
+    engineLabel.textContent = '等待本地服务连接';
+  }
 }
 
 function buildExportHtml() {
@@ -206,10 +509,42 @@ exportButton.addEventListener('click', () => {
   URL.revokeObjectURL(url);
   showToast('已导出独立 HTML，可以离线打开与演示。');
 });
+
+document.querySelectorAll('[data-mode]').forEach((button) => button.addEventListener('click', () => setMode(button.dataset.mode)));
+chatLog.addEventListener('click', (event) => {
+  const sample = event.target.closest('[data-sample]');
+  if (!sample) return;
+  chatInput.value = sample.dataset.sample;
+  autoGrowChatInput();
+  chatInput.focus();
+});
+chatSendButton.addEventListener('click', sendChat);
+document.querySelector('#chatResetButton').addEventListener('click', resetChat);
+chatInput.addEventListener('input', autoGrowChatInput);
+chatInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+    event.preventDefault();
+    sendChat();
+  }
+});
+
+document.querySelector('#settingsButton').addEventListener('click', openSettings);
+document.querySelector('#settingsCloseButton').addEventListener('click', closeSettings);
+settingsSaveButton.addEventListener('click', saveSettings);
+settingsTestButton.addEventListener('click', testSettings);
+settingsModal.addEventListener('click', (event) => {
+  if (event.target === settingsModal) closeSettings();
+});
+
 document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !settingsModal.hidden) {
+    closeSettings();
+    return;
+  }
   if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
     event.preventDefault();
-    generateDeck();
+    if (currentMode === 'chat') sendChat();
+    else generateDeck();
     return;
   }
   if (event.target === sourceText || event.target instanceof HTMLTextAreaElement || event.metaKey || event.ctrlKey || event.altKey) return;
@@ -218,8 +553,8 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && document.fullscreenElement) document.exitFullscreen();
 });
 
-fetch('/api/health').then((response) => response.json()).then((health) => {
-  if (health.mode === 'demo') document.querySelector('#engineLabel').textContent = '演示模式 · 无需 API Key';
-}).catch(() => {
-  document.querySelector('#engineLabel').textContent = '等待本地服务连接';
-});
+setMode('text');
+chatInput.style.height = '40px';
+renderChat();
+refreshHealth();
+loadSettings();

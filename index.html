@@ -23,6 +23,9 @@
         </a>
         <div class="topbar-right">
           <span class="engine-status"><span class="status-dot"></span><span id="engineLabel">演示引擎就绪</span></span>
+          <button id="settingsButton" class="icon-button settings-button" type="button" aria-label="模型设置" title="模型设置">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></svg>
+          </button>
           <a class="github-link" href="#how-it-works">了解更多 <span aria-hidden="true">↗</span></a>
         </div>
       </header>
@@ -31,34 +34,61 @@
         <section class="editor-panel" aria-labelledby="editor-title">
           <div class="section-kicker"><span class="kicker-line"></span> YOUR NEXT BIG IDEA</div>
           <h1 id="editor-title">让好内容<br />自然成为<span>好演示。</span></h1>
-          <p class="editor-intro">粘贴你的想法，AI 会把它整理成一场有重点、有节奏的演示。</p>
+          <p class="editor-intro">把想法交给 AI，它会整理成一场有重点、有节奏的演示。</p>
 
-          <label class="field-label" for="sourceText">原始文案 <span class="label-hint">支持粘贴长文本</span></label>
-          <div class="textarea-wrap">
-            <textarea id="sourceText" maxlength="20000" spellcheck="false" placeholder="粘贴文章、提案、研究笔记……"></textarea>
-            <div class="textarea-footer">
-              <button id="sampleButton" class="text-button" type="button"><span aria-hidden="true">✳</span> 使用示例文案</button>
-              <span id="charCount">0 / 20,000</span>
+          <div class="mode-switch" role="tablist" aria-label="生成方式">
+            <button id="textModeButton" class="mode-button active" type="button" role="tab" aria-selected="true" aria-controls="textModePanel" data-mode="text">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><path d="M10 9H8" /><path d="M16 13H8" /><path d="M16 17H8" /></svg>
+              文案生成
+            </button>
+            <button id="chatModeButton" class="mode-button" type="button" role="tab" aria-selected="false" aria-controls="chatModePanel" data-mode="chat">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+              对话生成
+            </button>
+          </div>
+
+          <div class="mode-panel" id="textModePanel" role="tabpanel" aria-labelledby="textModeButton">
+            <label class="field-label" for="sourceText">原始文案 <span class="label-hint">支持粘贴长文本</span></label>
+            <div class="textarea-wrap">
+              <textarea id="sourceText" maxlength="20000" spellcheck="false" placeholder="粘贴文章、提案、研究笔记……"></textarea>
+              <div class="textarea-footer">
+                <button id="sampleButton" class="text-button" type="button"><span aria-hidden="true">✳</span> 使用示例文案</button>
+                <span id="charCount">0 / 20,000</span>
+              </div>
+            </div>
+
+            <div class="generation-row">
+              <button id="generateButton" class="generate-button" type="button">
+                <span class="button-sparkle" aria-hidden="true">✳</span>
+                <span id="generateLabel">生成我的 PPT</span>
+                <span class="button-arrow" aria-hidden="true">↗</span>
+              </button>
+              <span class="generate-note"><span aria-hidden="true">◷</span> 大约需要 20 秒</span>
+            </div>
+
+            <section class="generation-status" id="generationStatus" aria-live="polite" hidden>
+              <div class="status-copy"><span id="progressMessage">正在准备</span><span id="progressValue">0%</span></div>
+              <div class="progress-track"><span id="progressFill"></span></div>
+            </section>
+          </div>
+
+          <div class="mode-panel" id="chatModePanel" role="tabpanel" aria-labelledby="chatModeButton" hidden>
+            <div class="chat-log" id="chatLog" aria-live="polite"></div>
+            <div class="chat-composer">
+              <textarea id="chatInput" rows="1" maxlength="4000" spellcheck="false" placeholder="说说你想要什么主题的演示……"></textarea>
+              <button id="chatSendButton" class="icon-button chat-send" type="button" aria-label="发送" title="发送">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" aria-hidden="true"><path d="m5 12 7-7 7 7" /><path d="M12 19V5" /></svg>
+              </button>
+            </div>
+            <div class="chat-bottom">
+              <button id="chatResetButton" class="text-button" type="button">清空对话</button>
+              <span class="chat-hint"><span id="chatTurnCount">0</span> 条消息</span>
             </div>
           </div>
 
-          <div class="generation-row">
-            <button id="generateButton" class="generate-button" type="button">
-              <span class="button-sparkle" aria-hidden="true">✳</span>
-              <span id="generateLabel">生成我的 PPT</span>
-              <span class="button-arrow" aria-hidden="true">↗</span>
-            </button>
-            <span class="generate-note"><span aria-hidden="true">◷</span> 大约需要 20 秒</span>
-          </div>
-
-          <section class="generation-status" id="generationStatus" aria-live="polite" hidden>
-            <div class="status-copy"><span id="progressMessage">正在准备</span><span id="progressValue">0%</span></div>
-            <div class="progress-track"><span id="progressFill"></span></div>
-          </section>
-
           <div class="editor-bottom">
             <div class="privacy-note"><span aria-hidden="true">◈</span> 你的内容仅用于本次生成</div>
-            <div class="keyboard-hint"><kbd>⌘</kbd> <kbd>↵</kbd> 快速生成</div>
+            <div class="keyboard-hint" id="quickHint"></div>
           </div>
         </section>
 
@@ -103,6 +133,37 @@
         <span>BUILT FOR IDEAS THAT MATTER</span>
       </footer>
     </div>
+
+    <div class="modal-backdrop" id="settingsModal" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+        <div class="modal-head">
+          <h2 class="modal-title" id="settingsTitle">模型设置</h2>
+          <button id="settingsCloseButton" class="icon-button modal-close" type="button" aria-label="关闭">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="field">
+            <label class="field-label" for="settingsKeyInput">API 密钥 <span class="label-hint" id="settingsKeyState"></span></label>
+            <input id="settingsKeyInput" class="text-input" type="password" autocomplete="off" spellcheck="false" placeholder="sk-…" />
+          </div>
+          <div class="field">
+            <label class="field-label" for="settingsUrlInput">接口地址 <span class="label-hint">兼容 OpenAI Chat Completions</span></label>
+            <input id="settingsUrlInput" class="text-input" type="text" autocomplete="off" spellcheck="false" placeholder="https://api.openai.com/v1" />
+          </div>
+          <div class="field">
+            <label class="field-label" for="settingsModelInput">模型名称</label>
+            <input id="settingsModelInput" class="text-input" type="text" autocomplete="off" spellcheck="false" placeholder="gpt-4o-mini" />
+          </div>
+          <p class="settings-status" id="settingsStatus"></p>
+        </div>
+        <div class="modal-foot">
+          <button id="settingsTestButton" class="ghost-button" type="button">测试连接</button>
+          <button id="settingsSaveButton" class="primary-button" type="button">保存</button>
+        </div>
+      </div>
+    </div>
+
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
   </body>
 </html>

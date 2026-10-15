@@ -1,9 +1,12 @@
 import { app, BrowserWindow, dialog, shell, session } from 'electron';
+import { join } from 'node:path';
 import { createAppServer } from './server.js';
 
 let localServer;
 
 function startLocalServer() {
+  // 安装目录通常不可写，桌面应用的模型设置固定存到 %APPDATA%\页间之间\config.json。
+  process.env.APP_CONFIG_PATH = join(app.getPath('appData'), '页间之间', 'config.json');
   return new Promise((resolve, reject) => {
     localServer = createAppServer();
     localServer.once('error', reject);

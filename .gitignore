@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 api.txt
+config.json
 
 # Dependencies and generated output
 node_modules/

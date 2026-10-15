@@ -1,8 +1,8 @@
 {
   "name": "ai-web-ppt-generator",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
-  "description": "把一段中文文案整理成网页演示文稿，并可打包为 Windows 桌面应用。",
+  "description": "把一段中文文案或一场对话，整理成网页演示文稿，并可打包为 Windows 桌面应用。",
   "author": "AxionMark",
   "homepage": "https://github.com/AxionMark/AI-Web-for-PPT",
   "type": "module",
