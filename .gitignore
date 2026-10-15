@@ -2,12 +2,17 @@
 .env
 .env.*
 !.env.example
+api.txt
 
 # Dependencies and generated output
 node_modules/
 dist/
-build/
 coverage/
+
+# Installer build leftovers
+build/*-unpacked/
+build/builder-debug.yml
+build/builder-effective-config.yaml
 
 # Logs and temporary files
 *.log

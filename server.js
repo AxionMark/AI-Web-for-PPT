@@ -10,7 +10,8 @@ const mimeTypes = {
   '.css': 'text/css; charset=utf-8',
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
-  '.json': 'application/json; charset=utf-8'
+  '.json': 'application/json; charset=utf-8',
+  '.svg': 'image/svg+xml'
 };
 
 function sendEvent(response, event, data) {
@@ -180,7 +181,8 @@ function sendJson(response, status, value) {
   response.end(JSON.stringify(value));
 }
 
-const server = createServer(async (request, response) => {
+export function createAppServer() {
+  return createServer(async (request, response) => {
   const pathname = new URL(request.url, 'http://localhost').pathname;
   if (pathname === '/api/health' && request.method === 'GET') {
     sendJson(response, 200, { status: 'ok', mode: process.env.OPENAI_API_KEY ? 'model' : 'demo' });
@@ -244,8 +246,12 @@ const server = createServer(async (request, response) => {
     }
     sendJson(response, 500, { error: '读取页面失败。' });
   }
-});
+  });
+}
 
-server.listen(port, () => {
-  console.log(`AI 网页 PPT 生成器已启动：http://localhost:${port}`);
-});
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const server = createAppServer();
+  server.listen(port, '127.0.0.1', () => {
+    console.log(`AI 网页 PPT 生成器已启动：http://127.0.0.1:${port}`);
+  });
+}

@@ -2,12 +2,66 @@
   "name": "ai-web-ppt-generator",
   "version": "1.0.0",
   "private": true,
+  "description": "把一段中文文案整理成网页演示文稿，并可打包为 Windows 桌面应用。",
+  "author": "AxionMark",
+  "homepage": "https://github.com/AxionMark/AI-Web-for-PPT",
   "type": "module",
+  "main": "main.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "app": "electron .",
+    "icon": "node tools/make-icon.mjs",
+    "dist": "electron-builder --win nsis portable",
+    "dist:portable": "electron-builder --win portable"
+  },
+  "build": {
+    "appId": "com.aiwebppt.studio",
+    "productName": "页间之间",
+    "asar": true,
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "server.js",
+      "index.html",
+      "app.js",
+      "styles.css",
+      "assets/**/*",
+      "package.json"
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "页间之间",
+      "artifactName": "ai-web-ppt-${version}-x64-setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "ai-web-ppt-${version}-x64-portable.${ext}"
+    }
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "electron": "^44.7.0",
+    "electron-builder": "^26.15.3"
   }
 }
